@@ -22,7 +22,8 @@ public with sharing class NextStepBatch implements Database.Batchable<sObject>{
 
     public Database.QueryLocator start(Database.BatchableContext bc){
         // Query for all accounts and return the query locator.
-        return null; // Update null with the query locator
+        // Update null with the query locator
+        return Database.getQueryLocator('SELECT Id, Description FROM Account');
     }
     
     public void execute(Database.BatchableContext bc, List<Account> scope){
@@ -31,27 +32,34 @@ public with sharing class NextStepBatch implements Database.Batchable<sObject>{
         // Update the Next Step field on each record in the batch scope.
 
         // Loop through the scope account records
-
+        for(Account acc : scope){
             // Set the Next Step field to 'Batching the next meetings together.'
-
+            acc.Next_Step__c = BATCH_NEXT_STEP;
+        }
         // Update the account records in this batch scope
-        
+        update scope;
         // Query for all opportunities related to the accounts in this batch scope
-
+        List <Opportunity> oppList = new List<Opportunity>();
+        oppList = [SELECT Id, Name, NextStep FROM Opportunity WHERE AccountId IN :scope];
         // Loop through the opportunity records
-
+        for(Opportunity opp : oppList){
             // Set the Next Step field to 'Batching the next meetings together.'
-
+            opp.NextStep = BATCH_NEXT_STEP;
+        }
         // Update the opportunity records
-
+        update oppList;
     }
     
     public void finish(Database.BatchableContext bc){
         final List<User> USERS = [SELECT Id, Name, Email FROM User WHERE IsActive = true AND (NOT Email LIKE 'autoproc%')]; // DO NOT CHANGE
 
         // Get the email addresses of all active users
-
+        Set<String> emailAddresses = new Set<String>();
+        for(User us : USERS){
+            emailAddresses.add(us.Email);
+        }
             // Pass the set of active user emails to the sendEmailToActiveUsers method
+            sendEmailToActiveUsers(emailAddresses);
     }
 
     // Helper method to send an email to all emails in the set
