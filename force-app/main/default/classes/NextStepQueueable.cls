@@ -17,7 +17,7 @@
  * 
  * Note: The class below contains placeholders for implementing a queueable job to update accounts and opportunities.
  */
-public with sharing class NextStepQueueable {
+public with sharing class NextStepQueueable implements Queueable{
 
     // Member variable to store the accounts
     private Map<Id,Account> accounts;
@@ -25,34 +25,59 @@ public with sharing class NextStepQueueable {
     // Constructor to accept the accounts
     public NextStepQueueable(Map<Id,Account> accounts) {
         // Store the accounts in a member variable
+        this.accounts = accounts;
     }
 
     // Method to queue the job
     public static void enqueueJob() {
         // Get 10 accounts with Next Step populated
+        List<Account> accList = [SELECT Id, Next_Step__c FROM Account WHERE Next_Step__c != null LIMIT 10];
+        Map <Id, Account> accountMap = new Map <Id, Account>();
+        for(Account acc : accList){
+        accountMap.put(acc.Id, acc);
+    }
 
         // If there are any accounts, queue the job using System.enqueueJob
+        if(accountMap.size() > 0) {
+            System.enqueueJob(new NextStepQueueable(accountMap));
+        }
     }
 
     /*
      * Update/Uncomment the template code to create a method
      * Method to execute the queueable job
      */
-    //[public | private ] [static] data_type execute (input parameters) {
+    public void execute(QueueableContext context) {
         // Get the accounts from the member variable
+        Set<Account> accSet = new Set<Account>();
+        accSet.addAll(accounts.values());  
 
-            // Remove the Next Step using the helper method
+        // Remove the Next Step using the helper method
+        for(Account acc :accSet){
+            removeNextStep(acc);
+        }
 
+        List <Account> listOfAcc = new List<Account>(accSet);
+        
         // Update the accounts
+        update listOfAcc;
 
         // Get the opportunities related to the accounts
+        List <Opportunity> oppList = new List<Opportunity>();
+        oppList = [SELECT Id, Name, NextStep FROM Opportunity WHERE AccountId IN :listOfAcc];
 
             // Remove the Next Step using the helper method
+            for(Opportunity opp :oppList){
+                removeNextStep(opp);
+            }
 
         // Update the opportunities
+        update oppList;
 
         // Call the enqueueJob method to queue another job to process more records.
-    //}
+        enqueueJob();
+        
+    }
 
     // Helper method to remove the Next Step
     // Overloaded method to accept an opportunity
@@ -66,3 +91,4 @@ public with sharing class NextStepQueueable {
         acc.Next_Step__c = null;
     }
 }
+
